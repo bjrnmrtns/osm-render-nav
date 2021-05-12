@@ -2,10 +2,17 @@ use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::*;
 
+use osmpbf::*;
+
 #[derive(Copy, Clone, Debug)]
 struct MyVertex { position: [f32; 2] }
 
 fn main() {
+    lyon();
+    osmpbf();
+}
+
+fn lyon() {
     // Build a Path.
     let mut builder = Path::builder();
     builder.begin(point(0.0, 0.0));
@@ -31,4 +38,31 @@ fn main() {
              geometry.vertices.len(),
              geometry.indices.len()
     );
+}
+
+
+fn osmpbf() {
+    let path = std::path::Path::new("map.osm.pbf");
+    let reader = ElementReader::from_path(path).unwrap();
+
+    println!("Counting...");
+
+    match reader.par_map_reduce(
+        |element| match element {
+            Element::Node(_) | Element::DenseNode(_) => (1, 0, 0),
+            Element::Way(_) => (0, 1, 0),
+            Element::Relation(_) => (0, 0, 1),
+        },
+        || (0u64, 0u64, 0u64),
+        |a, b| (a.0 + b.0, a.1 + b.1, a.2 + b.2),
+    ) {
+        Ok((nodes, ways, relations)) => {
+            println!("Nodes: {}", nodes);
+            println!("Ways: {}", ways);
+            println!("Relations: {}", relations);
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
+    }
 }
